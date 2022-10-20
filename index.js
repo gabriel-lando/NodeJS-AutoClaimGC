@@ -14,7 +14,7 @@ const sleep = async (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
 };
 
-let token_headers = {
+let gclubsess_headers = {
   "authority": "gamersclub.com.br",
   "cache-control": "max-age=0",
   "sec-ch-ua": '" Not;A Brand";v="99", "Microsoft Edge";v="97", "Chromium";v="97"',
@@ -31,7 +31,7 @@ let token_headers = {
   "cookie": `language=pt-br; gclubsess=${token.gclubsess}`,
 };
 
-let claim_headers = {
+let bearer_headers = {
   "authority": "missions-api.gamersclub.com.br",
   "sec-ch-ua": '" Not;A Brand";v="99", "Microsoft Edge";v="97", "Chromium";v="97"',
   "accept": "application/json, text/plain, */*",
@@ -81,7 +81,7 @@ function UpdateSession(cookies) {
       token.gclubsess = cookiesParsed.gclubsess;
 
       console.log("New token: " + token.gclubsess);
-      token_headers["cookie"] = `language=pt-br; gclubsess=${token.gclubsess}`;
+      gclubsess_headers["cookie"] = `language=pt-br; gclubsess=${token.gclubsess}`;
 
       fs.writeFile("./data/token.json", JSON.stringify(token, null, 2), { encoding: "UTF-8" }, () => {});
     }
@@ -93,7 +93,7 @@ async function GetBearerToken() {
     // Clear current token
     user_token = undefined;
 
-    token_options["headers"] = token_headers;
+    token_options["headers"] = gclubsess_headers;
     const response = await axios.get("https://gamersclub.com.br/daily-rewards", token_options);
     if (!response.data) return;
 
@@ -111,9 +111,8 @@ async function GetBearerToken() {
     const bearer_token = response.data.split("'gc:authToken', '")[1].split("');")[0];
     //console.log("Token: " + bearer_token);
 
-    claim_headers["authorization"] = `Bearer ${bearer_token}`;
-    check_options["headers"] = claim_headers;
-    claim_options["headers"] = claim_headers;
+    bearer_headers["authorization"] = `Bearer ${bearer_token}`;
+    check_options["headers"] = bearer_headers;
 
     return true;
   } catch (error) {
@@ -139,8 +138,9 @@ function IsDailyRewardsAvailable(data) {
 
 async function ClaimDailyRewards() {
   try {
+    claim_options["headers"] = gclubsess_headers;
     const response = await axios.post("https://gamersclub.com.br/api/missions/daily-rewards/claim", { token: user_token }, claim_options);
-    if (!response.data || response.data.statusCode != 200) return;
+    if (!response.data || response.data.status != 200) return;
 
     //console.log(response.data);
     console.log(`Claimed daily reward: ${dayly_available_name}`);
