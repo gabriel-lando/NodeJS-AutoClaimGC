@@ -32,7 +32,7 @@ let gclubsess_headers = {
 };
 
 let bearer_headers = {
-  "authority": "missions-api.gamersclub.com.br",
+  "authority": "gamersclub.com.br",
   "sec-ch-ua": '" Not;A Brand";v="99", "Microsoft Edge";v="97", "Chromium";v="97"',
   "accept": "application/json, text/plain, */*",
   "authorization": "Bearer ...",
@@ -46,7 +46,6 @@ let bearer_headers = {
   "sec-fetch-dest": "empty",
   "referer": "https://gamersclub.com.br/",
   "accept-language": "en-US,en;q=0.9,pt;q=0.8",
-  "if-none-match": 'W/"140a-yxZlDaNIijFu+eD9a+mUZQtZVMY"',
 };
 
 let token_options = {
@@ -116,7 +115,30 @@ async function GetBearerToken() {
 
     return true;
   } catch (error) {
-    console.error(error.message ?? error);
+    console.error("GetBearerToken: " + error.message ?? error);
+  }
+  return false;
+}
+
+async function GetBearerTokenFromApi() {
+  try {
+    // Clear current token
+    user_token = undefined;
+
+    const response = await axios.get("https://gamersclub.com.br/api/v1/user/token", { headers: gclubsess_headers });
+    if (!response.data) return;
+
+    UpdateSession(response.headers["set-cookie"]);
+
+    user_token = response.data.token;
+    // console.log("User token: " + user_token);
+
+    bearer_headers["authorization"] = `Bearer ${user_token}`;
+    check_options["headers"] = bearer_headers;
+
+    return true;
+  } catch (error) {
+    console.error("GetBearerTokenFromApi: " + error.message ?? error);
   }
   return false;
 }
@@ -142,6 +164,8 @@ async function ClaimDailyRewards() {
     const response = await axios.post("https://gamersclub.com.br/api/missions/daily-rewards/claim", { token: user_token }, claim_options);
     if (!response.data || response.data.status != 200) return;
 
+    UpdateSession(response.headers["set-cookie"]);
+
     //console.log(response.data);
     console.log(`Claimed daily reward: ${dayly_available_name}`);
   } catch (error) {
@@ -154,6 +178,8 @@ async function CheckDailyRewards() {
     const response = await axios.get("https://missions-api.gamersclub.com.br/player/daily-rewards", check_options);
     if (!response.data || response.data.statusCode != 200) return;
 
+    UpdateSession(response.headers["set-cookie"]);
+
     if (IsDailyRewardsAvailable(response.data.data)) {
       console.log(`Daily rewards available: ${dayly_available_name}`);
       ClaimDailyRewards();
@@ -163,9 +189,59 @@ async function CheckDailyRewards() {
   }
 }
 
+async function ClaimFreeSpin() {
+  try {
+    if ((await GetBearerTokenFromApi()) == false) {
+      console.error("ClaimFreeSpin: Error getting Bearer token from API.");
+      return;
+    }
+
+    const response = await axios.post("https://marketplace-api.gamersclub.com.br/v1/slotMachine/spins", {}, { headers: bearer_headers });
+    if (!response.data || response.data.statusCode != 200) return;
+
+    UpdateSession(response.headers["set-cookie"]);
+
+    const data = response.data.data;
+
+    if (data.won) {
+      console.log(`Claimed free spin: ${data.prize.name}`);
+    } else {
+      console.log(`Error caiming free spin: ${response.data.errors}`);
+    }
+  } catch (error) {
+    console.error("ClaimFreeSpin: " + (error.message ?? error));
+  }
+}
+
+async function CheckFreeSpin() {
+  try {
+    if ((await GetBearerTokenFromApi()) == false) {
+      console.error("CheckFreeSpin: Error getting Bearer token from API.");
+      return;
+    }
+
+    const response = await axios.get("https://marketplace-api.gamersclub.com.br/v1/slotMachine/spins", { headers: bearer_headers });
+    if (!response.data || response.data.statusCode != 200) return;
+
+    UpdateSession(response.headers["set-cookie"]);
+
+    const data = response.data.data;
+
+    if (data.freeSpins > 0) {
+      console.log(`Free spins available: ${data.freeSpins}`);
+      ClaimFreeSpin();
+    }
+  } catch (error) {
+    console.error("CheckFreeSpin: " + (error.message ?? error));
+  }
+}
+
 async function CheckDailyRewardsLoop() {
   while (true) {
-    if (await GetBearerToken()) CheckDailyRewards();
+    if (await GetBearerToken()) {
+      await CheckDailyRewards();
+      await CheckFreeSpin();
+    }
     await sleep(sleepTime);
   }
 }
