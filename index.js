@@ -164,8 +164,6 @@ async function ClaimDailyRewards() {
     const response = await axios.post("https://gamersclub.com.br/api/missions/daily-rewards/claim", { token: user_token }, claim_options);
     if (!response.data || response.data.status != 200) return;
 
-    UpdateSession(response.headers["set-cookie"]);
-
     //console.log(response.data);
     console.log(`Claimed daily reward: ${dayly_available_name}`);
   } catch (error) {
@@ -177,8 +175,6 @@ async function CheckDailyRewards() {
   try {
     const response = await axios.get("https://missions-api.gamersclub.com.br/player/daily-rewards", check_options);
     if (!response.data || response.data.statusCode != 200) return;
-
-    UpdateSession(response.headers["set-cookie"]);
 
     if (IsDailyRewardsAvailable(response.data.data)) {
       console.log(`Daily rewards available: ${dayly_available_name}`);
@@ -196,17 +192,15 @@ async function ClaimFreeSpin() {
       return;
     }
 
-    const response = await axios.post("https://marketplace-api.gamersclub.com.br/v1/slotMachine/spins", {}, { headers: bearer_headers });
+    const response = await axios.post("https://marketplace-api.gamersclub.com.br/v1/slotMachine/spin", {}, { headers: bearer_headers });
     if (!response.data || response.data.statusCode != 200) return;
-
-    UpdateSession(response.headers["set-cookie"]);
 
     const data = response.data.data;
 
-    if (data.won) {
+    if (data.prize) {
       console.log(`Claimed free spin: ${data.prize.name}`);
     } else {
-      console.log(`Error caiming free spin: ${response.data.errors}`);
+      console.log(`Error caiming free spin: ${response.data}`);
     }
   } catch (error) {
     console.error("ClaimFreeSpin: " + (error.message ?? error));
@@ -222,8 +216,6 @@ async function CheckFreeSpin() {
 
     const response = await axios.get("https://marketplace-api.gamersclub.com.br/v1/slotMachine/spins", { headers: bearer_headers });
     if (!response.data || response.data.statusCode != 200) return;
-
-    UpdateSession(response.headers["set-cookie"]);
 
     const data = response.data.data;
 
