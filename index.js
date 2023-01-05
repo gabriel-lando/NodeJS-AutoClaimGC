@@ -9,6 +9,12 @@ try {
   else token = {};
 }
 
+// Process env variables
+let enabled = {};
+if (!process.env.DISABLE_SPIN) enabled.spin = true;
+if (!process.env.DISABLE_DAILY) enabled.daily = true;
+if (!process.env.DISABLE_BULLET) enabled.bullet = true;
+
 const sleepTime = 1000 * 60 * 60 * 5; // 5 hours
 const sleep = async (ms) => {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -325,9 +331,9 @@ async function ClaimFreeSpin() {
 async function CheckDailyRewardsLoop() {
   while (true) {
     if (await GetBearerToken()) {
-      await CheckDailyRewards();
-      await CheckBullets();
-      await CheckFreeSpin();
+      if (enabled.daily) await CheckDailyRewards();
+      if (enabled.bullet) await CheckBullets();
+      if (enabled.spin) await CheckFreeSpin();
     }
     await sleep(sleepTime);
   }
