@@ -48,20 +48,11 @@ let bearer_headers = {
   "accept-language": "en-US,en;q=0.9,pt;q=0.8",
 };
 
-let token_options = {
-  url: "https://gamersclub.com.br/daily-rewards",
-  headers: undefined,
-};
-
 let check_options = {
-  url: "https://missions-api.gamersclub.com.br/player/daily-rewards",
   headers: undefined,
 };
 
-let claim_options = {
-  headers: undefined,
-};
-
+let user_info = undefined;
 let user_token = undefined;
 
 function UpdateSession(cookies) {
@@ -87,13 +78,46 @@ function UpdateSession(cookies) {
   }
 }
 
+async function GetUserInfo() {
+  try {
+    // Clear current token
+    user_info = {};
+
+    const response = await axios.get("https://gamersclub.com.br/meuperfil", { headers: gclubsess_headers });
+    if (!response.data) return;
+
+    let index = response.data.indexOf('steamId64: "');
+    if (index < 0) throw new Error("Steam ID not found. Please, check gclubsess token.");
+    user_info.credential = response.data.match(/steamId64: "(.*)"/)[1];
+    // console.log("Steam ID: " + user_info.credential);
+
+    index = response.data.indexOf("playerId:");
+    if (index < 0) throw new Error("GC ID not found. Please, check gclubsess token.");
+    user_info.id = response.data.match(/playerId: ([0-9]*)/)[1].replace(/,/g, "");
+    // console.log("GC ID: " + user_info.id);
+
+    index = response.data.indexOf("nick: '");
+    if (index < 0) throw new Error("Nick not found. Please, check gclubsess token.");
+    user_info.nick = response.data.match(/nick: '(.*)'/)[1];
+    // console.log("GC Nick: " + user_info.nick);
+
+    user_info.create_time = new Date().toISOString();
+
+    UpdateSession(response.headers["set-cookie"]);
+
+    return true;
+  } catch (error) {
+    console.error("GetUserInfo1: " + error.message ?? error);
+  }
+  return false;
+}
+
 async function GetBearerToken() {
   try {
     // Clear current token
     user_token = undefined;
 
-    token_options["headers"] = gclubsess_headers;
-    const response = await axios.get("https://gamersclub.com.br/daily-rewards", token_options);
+    const response = await axios.get("https://gamersclub.com.br/daily-rewards", { headers: gclubsess_headers });
     if (!response.data) return;
 
     let index = response.data.indexOf("token:");
@@ -120,12 +144,19 @@ async function GetBearerToken() {
   return false;
 }
 
-async function GetBearerTokenFromApi() {
+async function GetBearerTokenFromApi(withParams = false) {
   try {
     // Clear current token
     user_token = undefined;
 
-    const response = await axios.get("https://gamersclub.com.br/api/v1/user/token", { headers: gclubsess_headers });
+    let params = {};
+    if (withParams) {
+      params = {
+        service: "coins",
+      };
+    }
+
+    const response = await axios.get("https://gamersclub.com.br/api/v1/user/token", { params, headers: gclubsess_headers });
     if (!response.data) return;
 
     UpdateSession(response.headers["set-cookie"]);
@@ -158,19 +189,6 @@ function IsDailyRewardsAvailable(data) {
   return available;
 }
 
-async function ClaimDailyRewards() {
-  try {
-    claim_options["headers"] = gclubsess_headers;
-    const response = await axios.post("https://gamersclub.com.br/api/missions/daily-rewards/claim", { token: user_token }, claim_options);
-    if (!response.data || response.data.status != 200) return;
-
-    //console.log(response.data);
-    console.log(`Claimed daily reward: ${dayly_available_name}`);
-  } catch (error) {
-    console.error("ClaimDailyRewards: " + (error.message ?? error));
-  }
-}
-
 async function CheckDailyRewards() {
   try {
     const response = await axios.get("https://missions-api.gamersclub.com.br/player/daily-rewards", check_options);
@@ -182,6 +200,103 @@ async function CheckDailyRewards() {
     }
   } catch (error) {
     console.error("CheckDailyRewards: " + (error.message ?? error));
+  }
+}
+
+async function ClaimDailyRewards() {
+  try {
+    const response = await axios.post("https://gamersclub.com.br/api/missions/daily-rewards/claim", { token: user_token }, { headers: gclubsess_headers });
+    if (!response.data || response.data.status != 200) return;
+
+    //console.log(response.data);
+    console.log(`Claimed daily reward: ${dayly_available_name}`);
+  } catch (error) {
+    console.error("ClaimDailyRewards: " + (error.message ?? error));
+  }
+}
+
+async function CheckBullets() {
+  try {
+    if ((await GetUserInfo()) == false) {
+      console.error("CheckBullets: Error getting User Info.");
+      return;
+    }
+
+    if ((await GetBearerTokenFromApi(true)) == false) {
+      console.error("CheckBullets: Error getting Bearer token from API.");
+      return;
+    }
+
+    const params = {
+      credential: user_info.credential,
+    };
+
+    const response = await axios.get("https://vault-api.gamersclub.com.br/api/dailyRewardsVault/playerKeys", { params, headers: bearer_headers });
+    if (!response.data || response.data.statusCode != 201) return;
+
+    const data = response.data.data;
+    // console.log("CheckBullets data: " + JSON.stringify(data));
+
+    if (data.keys.length > 0 && data.keys[0].amount > 0) {
+      console.log(`Bullets available: ${data.keys[0].amount}`);
+      await ClaimBullets();
+    }
+  } catch (error) {
+    console.error("CheckBullets: " + (error.message ?? error));
+  }
+}
+
+async function ClaimBullets() {
+  try {
+    if ((await GetUserInfo()) == false) {
+      console.error("ClaimBullets: Error getting Steam ID.");
+      return;
+    }
+
+    if ((await GetBearerTokenFromApi(true)) == false) {
+      console.error("ClaimBullets: Error getting Bearer token from API.");
+      return;
+    }
+
+    const params = {
+      slug: "daily-rewards-bonus",
+      user: user_info,
+    };
+
+    const response = await axios.post("https://vault-api.gamersclub.com.br/api/dailyRewardsVault/drop", params, { headers: bearer_headers });
+    if (!response.data || response.data.statusCode != 201) return;
+
+    const data = response.data.data;
+    // console.log("ClaimBullets data: " + JSON.stringify(data));
+
+    if (data.item) {
+      console.log(`Claimed bullet: ${data.item.name}`);
+    } else {
+      console.log(`Error caiming bullet: ${response.data}`);
+    }
+  } catch (error) {
+    console.error("ClaimBullets: " + (error.message ?? error));
+  }
+}
+
+async function CheckFreeSpin() {
+  try {
+    if ((await GetBearerTokenFromApi()) == false) {
+      console.error("CheckFreeSpin: Error getting Bearer token from API.");
+      return;
+    }
+
+    const response = await axios.get("https://marketplace-api.gamersclub.com.br/v1/slotMachine/spins", { headers: bearer_headers });
+    if (!response.data || response.data.statusCode != 200) return;
+
+    const data = response.data.data;
+
+    if (data.freeSpins > 0) {
+      console.log(`Free spins available: ${data.freeSpins}`);
+      ClaimFreeSpin();
+    }
+  } catch (error) {
+    console.error("CheckFreeSpin: " + (error.message ?? error));
   }
 }
 
@@ -207,31 +322,11 @@ async function ClaimFreeSpin() {
   }
 }
 
-async function CheckFreeSpin() {
-  try {
-    if ((await GetBearerTokenFromApi()) == false) {
-      console.error("CheckFreeSpin: Error getting Bearer token from API.");
-      return;
-    }
-
-    const response = await axios.get("https://marketplace-api.gamersclub.com.br/v1/slotMachine/spins", { headers: bearer_headers });
-    if (!response.data || response.data.statusCode != 200) return;
-
-    const data = response.data.data;
-
-    if (data.freeSpins > 0) {
-      console.log(`Free spins available: ${data.freeSpins}`);
-      ClaimFreeSpin();
-    }
-  } catch (error) {
-    console.error("CheckFreeSpin: " + (error.message ?? error));
-  }
-}
-
 async function CheckDailyRewardsLoop() {
   while (true) {
     if (await GetBearerToken()) {
       await CheckDailyRewards();
+      await CheckBullets();
       await CheckFreeSpin();
     }
     await sleep(sleepTime);
