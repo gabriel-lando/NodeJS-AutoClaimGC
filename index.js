@@ -10,10 +10,15 @@ try {
 }
 
 // Process env variables
-let enabled = {};
-if (!process.env.DISABLE_SPIN) enabled.spin = true;
-if (!process.env.DISABLE_DAILY) enabled.daily = true;
-if (!process.env.DISABLE_BULLET) enabled.bullet = true;
+let enabled = {
+  spin: true,
+  daily: true,
+  bullet: true,
+};
+
+if (process.env.DISABLE_SPIN) enabled.spin = JSON.parse(process.env.DISABLE_SPIN);
+if (process.env.DISABLE_DAILY) enabled.daily = JSON.parse(process.env.DISABLE_DAILY);
+if (process.env.DISABLE_BULLET) enabled.bullet = JSON.parse(process.env.DISABLE_BULLET);
 
 const sleepTime = 1000 * 60 * 60 * 5; // 5 hours
 const sleep = async (ms) => {
