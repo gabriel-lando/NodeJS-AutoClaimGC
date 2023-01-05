@@ -10,15 +10,10 @@ try {
 }
 
 // Process env variables
-let enabled = {
-  spin: true,
-  daily: true,
-  bullet: true,
-};
-
-if (process.env.DISABLE_SPIN) enabled.spin = JSON.parse(process.env.DISABLE_SPIN);
-if (process.env.DISABLE_DAILY) enabled.daily = JSON.parse(process.env.DISABLE_DAILY);
-if (process.env.DISABLE_BULLET) enabled.bullet = JSON.parse(process.env.DISABLE_BULLET);
+let disabled = {};
+if (process.env.DISABLE_SPIN) disabled.spin = JSON.parse(process.env.DISABLE_SPIN);
+if (process.env.DISABLE_DAILY) disabled.daily = JSON.parse(process.env.DISABLE_DAILY);
+if (process.env.DISABLE_BULLET) disabled.bullet = JSON.parse(process.env.DISABLE_BULLET);
 
 const sleepTime = 1000 * 60 * 60 * 5; // 5 hours
 const sleep = async (ms) => {
@@ -336,9 +331,9 @@ async function ClaimFreeSpin() {
 async function CheckDailyRewardsLoop() {
   while (true) {
     if (await GetBearerToken()) {
-      if (enabled.daily) await CheckDailyRewards();
-      if (enabled.bullet) await CheckBullets();
-      if (enabled.spin) await CheckFreeSpin();
+      if (!disabled.daily) await CheckDailyRewards();
+      if (!disabled.bullet) await CheckBullets();
+      if (!disabled.spin) await CheckFreeSpin();
     }
     await sleep(sleepTime);
   }
