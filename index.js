@@ -76,7 +76,7 @@ function UpdateSession(cookies) {
     if (cookiesParsed.gclubsess && cookiesParsed.gclubsess != token.gclubsess) {
       token.gclubsess = cookiesParsed.gclubsess;
 
-      console.log("New token: " + token.gclubsess);
+      // console.log("New token: " + token.gclubsess);
       gclubsess_headers["cookie"] = `language=pt-br; gclubsess=${token.gclubsess}`;
 
       fs.writeFile("./data/token.json", JSON.stringify(token, null, 2), { encoding: "UTF-8" }, () => {});
@@ -113,7 +113,7 @@ async function GetUserInfo() {
 
     return true;
   } catch (error) {
-    console.error("GetUserInfo1: " + error.message ?? error);
+    console.error("GetUserInfo: " + error.message ?? error);
   }
   return false;
 }
@@ -201,7 +201,7 @@ async function CheckDailyRewards() {
     if (!response.data || response.data.statusCode != 200) return;
 
     if (IsDailyRewardsAvailable(response.data.data)) {
-      console.log(`Daily rewards available: ${dayly_available_name}`);
+      // console.log(`Daily rewards available: ${dayly_available_name}`);
       ClaimDailyRewards();
     }
   } catch (error) {
@@ -214,7 +214,6 @@ async function ClaimDailyRewards() {
     const response = await axios.post("https://gamersclub.com.br/api/missions/daily-rewards/claim", { token: user_token }, { headers: gclubsess_headers });
     if (!response.data || response.data.status != 200) return;
 
-    //console.log(response.data);
     console.log(`Claimed daily reward: ${dayly_available_name}`);
   } catch (error) {
     console.error("ClaimDailyRewards: " + (error.message ?? error));
@@ -244,7 +243,7 @@ async function CheckBullets() {
     // console.log("CheckBullets data: " + JSON.stringify(data));
 
     if (data.keys.length > 0 && data.keys[0].amount > 0) {
-      console.log(`Bullets available: ${data.keys[0].amount}`);
+      // console.log(`Bullets available: ${data.keys[0].amount}`);
       await ClaimBullets();
     }
   } catch (error) {
@@ -298,7 +297,7 @@ async function CheckFreeSpin() {
     const data = response.data.data;
 
     if (data.freeSpins > 0) {
-      console.log(`Free spins available: ${data.freeSpins}`);
+      // console.log(`Free spins available: ${data.freeSpins}`);
       ClaimFreeSpin();
     }
   } catch (error) {
